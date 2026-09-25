@@ -20,12 +20,12 @@ want to avoid:
 | | Official `vaultwarden/server` (Alpine) | This image |
 |---|---|---|
 | Runs as | root (no `USER` directive) | non-root, unprivileged (`nonroot:nonroot`, uid 65532) |
-| Base OS packages at runtime | `apk`, `curl`, `busybox sh`, `tzdata` | none — [distroless](https://github.com/GoogleContainerTools/distroless) `static-debian12`, no shell, no package manager |
+| Base OS packages at runtime | `apk`, `curl`, `busybox sh`, `tzdata` | none: [distroless](https://github.com/GoogleContainerTools/distroless) `static-debian12`, no shell, no package manager |
 | Bundled DB drivers | mysql + postgresql + sqlite, always, regardless of use | sqlite only by default (configurable via `--build-arg DB=...`) |
-| Binary linking | dynamic (musl + system OpenSSL/sqlite via Alpine packages) | fully static (musl target + `vendored_openssl` + bundled sqlite) — no runtime library dependencies at all |
+| Binary linking | dynamic (musl + system OpenSSL/sqlite via Alpine packages) | fully static (musl target + `vendored_openssl` + bundled sqlite); no runtime library dependencies at all |
 | Supply chain | unsigned | signed with [cosign](https://github.com/sigstore/cosign) (keyless, via GitHub OIDC), SBOM generated and attested |
 
-None of this is a criticism of the upstream project — Alpine + root is
+None of this is a criticism of the upstream project: Alpine + root is
 a completely reasonable default for a self-hosted homelab tool. It's
 just a gap: as of writing, Vaultwarden isn't in Docker's
 [Hardened Images](https://hub.docker.com/hardened-images/catalog)
@@ -33,20 +33,20 @@ catalog, and no rootless/distroless variant is officially published.
 
 ## What's in this repo
 
-- `docker/Dockerfile.hardened` — the hardened multi-stage build. It is
+- `docker/Dockerfile.hardened`: the hardened multi-stage build. It is
   built with a **pinned checkout of upstream Vaultwarden source as the
-  build context**, not this repo (see below) — this repo only supplies
+  build context**, not this repo (see below); this repo only supplies
   the build definition and pipeline.
-- `.github/workflows/build-push.yml` — CI that, on every push to `main`
+- `.github/workflows/build-push.yml`: CI that, on every push to `main`
   or version tag:
   1. clones the pinned upstream source tag
   2. builds `linux/amd64` + `linux/arm64` via Buildx/QEMU
   3. pushes to Docker Hub
   4. scans the pushed image with [Trivy](https://github.com/aquasecurity/trivy)
   5. generates an SPDX SBOM with [Syft](https://github.com/anchore/syft)
-  6. signs the image digest with cosign (keyless — no signing key to manage or leak)
+  6. signs the image digest with cosign (keyless, no signing key to manage or leak)
   7. attests the SBOM to the image with cosign
-- `docker-compose.example.yml` — a runnable example applying the
+- `docker-compose.example.yml`: a runnable example applying the
   runtime-side hardening (`read_only`, `cap_drop: ALL`, `no-new-privileges`)
   that pairs with this image.
 
@@ -86,7 +86,7 @@ docker compose -f docker-compose.example.yml up -d
 
 ### Health checks
 
-This image has no `HEALTHCHECK` — distroless has no shell or `curl` to
+This image has no `HEALTHCHECK`: distroless has no shell or `curl` to
 run one with. Use your orchestrator's native HTTP probe against
 `GET /alive` on port 8080 instead (see the example in
 `docker-compose.example.yml`, or a Kubernetes `livenessProbe.httpGet`
@@ -116,8 +116,8 @@ cosign verify-attestation --type spdxjson \
 
 - The web-vault base image is pinned by tag, not by digest. Upstream's
   own Dockerfile recommends pinning by digest for immutability; this
-  repo notes the same recommendation but doesn't yet enforce it —
-  resolving a tag to its digest and updating the `WEB_VAULT_TAG`
+  repo notes the same recommendation but doesn't yet enforce it.
+  Resolving a tag to its digest and updating the `WEB_VAULT_TAG`
   build arg accordingly is a natural follow-up.
 - Only `linux/amd64` and `linux/arm64` are built. Upstream also
   supports `armv6`/`armv7`; those aren't included here to keep the
@@ -133,5 +133,5 @@ definition and pipeline layered on top of an unmodified, publicly
 available, pinned upstream checkout, so upstream's own public
 repository satisfies AGPL's source-availability requirement. This
 repo's own files (Dockerfile, workflow, compose file) are original
-work and unlicensed unless you add a LICENSE file — do that before
+work and unlicensed unless you add a LICENSE file. Do that before
 treating this as a project others can reuse.
