@@ -18,78 +18,62 @@
 #   - No Docker HEALTHCHECK: distroless has no shell/curl to run one.
 #     Use your orchestrator's native HTTP probe against /alive instead
 #     (see README.md and docker-compose.example.yml).
-
+# Must be declared before the first FROM to be usable in any FROM
+# instruction later in the file (Docker only gives ARG that scope when
+# it precedes the first stage).
+ARG WEB_VAULT_TAG=v2026.7.0
 ########################## BUILD IMAGES (musl, static) ##########################
 FROM --platform=$BUILDPLATFORM ghcr.io/blackdex/rust-musl:x86_64-musl-stable-1.98.1 AS build_amd64
 FROM --platform=$BUILDPLATFORM ghcr.io/blackdex/rust-musl:aarch64-musl-stable-1.98.1 AS build_arm64
-
 # hadolint ignore=DL3006
 FROM --platform=$BUILDPLATFORM build_${TARGETARCH} AS build
 ARG TARGETARCH
-
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
 ENV CARGO_HOME="/root/.cargo" \
     LANG=C.UTF-8 \
     TZ=UTC
-
 RUN mkdir -pv "${CARGO_HOME}" && rustup set profile minimal
-
 # Dummy project first so dependency compilation is cached independently
 # of application source changes.
 RUN cargo new --bin /app
 WORKDIR /app
-
 # blackdex/rust-musl images set CARGO_BUILD_TARGET to match the image's arch
 RUN echo "export CARGO_TARGET=${CARGO_BUILD_TARGET}" > /env-cargo && cat /env-cargo
 RUN . /env-cargo && rustup target add "${CARGO_TARGET}"
-
 COPY ./Cargo.* ./rust-toolchain.toml ./build.rs ./
 COPY ./macros ./macros
-
 # Only sqlite + vendored (statically linked) OpenSSL by default: this is
 # the actual hardening delta vs. upstream, which always bundles
 # mysql+postgresql+sqlite regardless of what you deploy with.
 ARG DB=sqlite,vendored_openssl,enable_mimalloc
-
 RUN . /env-cargo && \
     cargo build --features "${DB}" --release --target="${CARGO_TARGET}" && \
     find . -not -path "./target*" -delete
-
 COPY . .
-
 ARG VW_VERSION
 ENV VW_VERSION=${VW_VERSION}
-
 RUN . /env-cargo && \
     touch build.rs src/main.rs && \
     cargo build --features "${DB}" --release --target="${CARGO_TARGET}" && \
     ln -vfsr "/app/target/${CARGO_TARGET}/release" /app/target/final && \
     mkdir -p /data
-
 ########################## WEB VAULT ##########################
-# Pin by tag here; see README.md for how to resolve+pin this to a digest,
-# which is the stronger supply-chain practice upstream itself recommends.
-ARG WEB_VAULT_TAG=v2026.7.0
+# WEB_VAULT_TAG is declared at the top of the file; see README.md for
+# how to resolve+pin this to a digest, which is the stronger
+# supply-chain practice upstream itself recommends.
 FROM --platform=$BUILDPLATFORM docker.io/vaultwarden/web-vault:${WEB_VAULT_TAG} AS vault
-
 ########################## RUNTIME (distroless, non-root) ##########################
-FROM --platform=$TARGETPLATFORM gcr.io/distroless/static-debian12:nonroot AS runtime
-
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 ENV ROCKET_PROFILE="release" \
     ROCKET_ADDRESS=0.0.0.0 \
     ROCKET_PORT=8080 \
     SSL_CERT_DIR=/etc/ssl/certs \
     DATA_FOLDER=/data
-
 WORKDIR /
-
 COPY --from=build --chown=nonroot:nonroot /data /data
 COPY --from=vault --chown=nonroot:nonroot /web-vault ./web-vault
 COPY --from=build --chown=nonroot:nonroot /app/target/final/vaultwarden /vaultwarden
-
 USER nonroot:nonroot
 VOLUME ["/data"]
 EXPOSE 8080
-
 ENTRYPOINT ["/vaultwarden"]
