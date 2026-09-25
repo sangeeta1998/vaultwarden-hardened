@@ -11,10 +11,6 @@ on:
         required: false
         default: "1.37.3"
 
-env:
-  IMAGE_NAME: vaultwarden-hardened
-  VAULTWARDEN_REF: ${{ inputs.vaultwarden_ref || '1.37.3' }}
-
 permissions:
   contents: read
   id-token: write   # required for keyless cosign signing via GitHub OIDC
@@ -22,6 +18,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: vaultwarden-hardened
+      VAULTWARDEN_REF: ${{ inputs.vaultwarden_ref || '1.37.3' }}
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -67,7 +66,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Scan pushed image with Trivy
-        uses: aquasecurity/trivy-action@0.29.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           format: table
