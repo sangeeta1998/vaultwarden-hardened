@@ -1,0 +1,24 @@
+services:
+  vaultwarden:
+    image: <your-dockerhub-username>/vaultwarden-hardened:1.37.3
+    container_name: vaultwarden
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    ports:
+      - "8080:8080"
+    volumes:
+      - vw-data:/data
+    environment:
+      DOMAIN: "https://vault.example.com"
+    # No HEALTHCHECK is baked into the image (distroless has no shell/curl).
+    # If your orchestrator supports it, point a native HTTP probe at
+    # GET http://localhost:8080/alive instead.
+
+volumes:
+  vw-data:
