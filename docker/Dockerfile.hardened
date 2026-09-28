@@ -1,12 +1,4 @@
-# syntax=docker/dockerfile:1
-#
-# Hardened, non-root, distroless Vaultwarden image.
-#
-# This Dockerfile is NOT run against this repo as build context. It is run
-# against a pinned checkout of the upstream dani-garcia/vaultwarden source
-# (see .github/workflows/build-push.yml or README.md for the exact command).
-#
-# What this changes vs. the official vaultwarden/server:*-alpine image:
+this vs. the official vaultwarden/server:*-alpine image:
 #   - Final image ships zero OS packages: no apk, no shell, no curl.
 #     (upstream's Alpine runtime image keeps apk/curl/busybox sh available)
 #   - Runs as a non-root, non-privileged user (upstream runs as root).
